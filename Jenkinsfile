@@ -5,7 +5,7 @@ pipeline {
     // --- Git ---
     GIT_URL      = "https://github.com/kranthi31/dockejava.git"
     GIT_BRANCH   = "main"
-    GIT_CREDS_ID = ""   // put Jenkins credentialsId here OR leave blank for public repo
+    GIT_CREDS_ID = ""   // set Jenkins credentialsId if private repo, else keep ""
 
     // --- AWS/ECR ---
     AWS_REGION   = "us-west-2"
@@ -13,6 +13,10 @@ pipeline {
     ECR_REPO     = "rails-app"
     ECR_REGISTRY = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com"
     IMAGE_TAG    = "${BUILD_NUMBER}"
+  }
+
+  options {
+    skipDefaultCheckout(true)   // prevent Jenkins from doing an extra checkout automatically
   }
 
   stages {
@@ -26,7 +30,10 @@ pipeline {
 
           checkout([$class: 'GitSCM',
             branches: [[name: "*/${env.GIT_BRANCH}"]],
-            userRemoteConfigs: [remoteCfg]
+            userRemoteConfigs: [remoteCfg],
+            extensions: [
+              [$class: 'CleanBeforeCheckout']   // clean workspace before checkout
+            ]
           ])
         }
       }
@@ -34,25 +41,49 @@ pipeline {
 
     stage('Build Docker Image') {
       steps {
-        sh "docker build -t ${ECR_REPO}:${IMAGE_TAG} ."
+        script {
+          if (isUnix()) {
+            sh "docker build -t ${ECR_REPO}:${IMAGE_TAG} ."
+          } else {
+            bat "docker build -t %ECR_REPO%:%IMAGE_TAG% ."
+          }
+        }
       }
     }
 
     stage('Login to ECR') {
       steps {
-        sh """
-          aws ecr get-login-password --region ${AWS_REGION} | \
-          docker login --username AWS --password-stdin ${ECR_REGISTRY}
-        """
+        script {
+          if (isUnix()) {
+            sh """
+              aws ecr get-login-password --region ${AWS_REGION} | \
+              docker login --username AWS --password-stdin ${ECR_REGISTRY}
+            """
+          } else {
+            // Windows: no backslash line continuation, use cmd piping
+            bat """
+              aws ecr get-login-password --region %AWS_REGION% | docker login --username AWS --password-stdin %ECR_REGISTRY%
+            """
+          }
+        }
       }
     }
 
     stage('Tag & Push') {
       steps {
-        sh """
-          docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
-          docker push ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
-        """
+        script {
+          if (isUnix()) {
+            sh """
+              docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
+              docker push ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
+            """
+          } else {
+            bat """
+              docker tag %ECR_REPO%:%IMAGE_TAG% %ECR_REGISTRY%/%ECR_REPO%:%IMAGE_TAG%
+              docker push %ECR_REGISTRY%/%ECR_REPO%:%IMAGE_TAG%
+            """
+          }
+        }
       }
     }
   }
