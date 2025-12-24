@@ -13,10 +13,13 @@ pipeline {
     ECR_REPO     = "rails-app"
     ECR_REGISTRY = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com"
     IMAGE_TAG    = "${BUILD_NUMBER}"
+
+    // Jenkins AWS credentialsId (Kind: AWS Credentials)
+    AWS_CREDS_ID = "aws-ecr-creds"
   }
 
   options {
-    skipDefaultCheckout(true)   // prevent Jenkins from doing an extra checkout automatically
+    skipDefaultCheckout(true)
   }
 
   stages {
@@ -31,9 +34,7 @@ pipeline {
           checkout([$class: 'GitSCM',
             branches: [[name: "*/${env.GIT_BRANCH}"]],
             userRemoteConfigs: [remoteCfg],
-            extensions: [
-              [$class: 'CleanBeforeCheckout']   // clean workspace before checkout
-            ]
+            extensions: [[$class: 'CleanBeforeCheckout']]
           ])
         }
       }
@@ -45,7 +46,7 @@ pipeline {
           if (isUnix()) {
             sh "docker build -t ${ECR_REPO}:${IMAGE_TAG} ."
           } else {
-            bat "docker build -t %ECR_REPO%:%IMAGE_TAG% ."
+            bat 'docker build -t %ECR_REPO%:%IMAGE_TAG% .'
           }
         }
       }
@@ -53,17 +54,22 @@ pipeline {
 
     stage('Login to ECR') {
       steps {
-        script {
-          if (isUnix()) {
-            sh """
-              aws ecr get-login-password --region ${AWS_REGION} | \
-              docker login --username kranthi-test --password-stdin ${ECR_REGISTRY}
-            """
-          } else {
-            // Windows: no backslash line continuation, use cmd piping
-            bat """
-              aws ecr get-login-password --region %AWS_REGION% | docker login --username AWS --password-stdin %ECR_REGISTRY%
-            """
+        // This injects AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for aws cli calls
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDS_ID}"]]) {
+          script {
+            if (isUnix()) {
+              sh """
+                aws sts get-caller-identity
+                aws ecr get-login-password --region ${AWS_REGION} | \
+                  docker login --username AWS --password-stdin ${ECR_REGISTRY}
+              """
+            } else {
+              // Run as one line in cmd.exe
+              bat """
+                aws sts get-caller-identity
+                aws ecr get-login-password --region %AWS_REGION% | docker login --username AWS --password-stdin %ECR_REGISTRY%
+              """
+            }
           }
         }
       }
@@ -78,6 +84,7 @@ pipeline {
               docker push ${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
             """
           } else {
+            // Use forward slashes - docker accepts them on Windows too
             bat """
               docker tag %ECR_REPO%:%IMAGE_TAG% %ECR_REGISTRY%/%ECR_REPO%:%IMAGE_TAG%
               docker push %ECR_REGISTRY%/%ECR_REPO%:%IMAGE_TAG%
