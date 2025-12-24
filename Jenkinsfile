@@ -2,11 +2,6 @@ pipeline {
   agent any
 
   environment {
-    // --- Git in script ---
-    GIT_URL      = "https://github.com/ORG/REPO.git"
-    GIT_BRANCH   = "main"
-    GIT_CREDS_ID = "git-creds-id"   // Jenkins Credentials ID (PAT or SSH key)
-
     // --- AWS/ECR ---
     AWS_REGION   = "us-west-2"
     AWS_ACCOUNT  = "548889528327"
