@@ -61,7 +61,7 @@ pipeline {
               sh """
                 aws sts get-caller-identity
                 aws ecr get-login-password --region ${AWS_REGION} | \
-                  docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                  docker login --username kranthi-test --password-stdin ${ECR_REGISTRY}
               """
             } else {
               // Run as one line in cmd.exe
