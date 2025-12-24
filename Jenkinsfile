@@ -2,6 +2,11 @@ pipeline {
   agent any
 
   environment {
+    // --- Git ---
+    GIT_URL      = "https://github.com/kranthi31/dockejava.git"
+    GIT_BRANCH   = "main"
+    GIT_CREDS_ID = ""   // put Jenkins credentialsId here OR leave blank for public repo
+
     // --- AWS/ECR ---
     AWS_REGION   = "us-west-2"
     AWS_ACCOUNT  = "548889528327"
@@ -13,13 +18,17 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        checkout([$class: 'GitSCM',
-          branches: [[name: "*/${env.GIT_BRANCH}"]],
-          userRemoteConfigs: [[
-            url: env.GIT_URL,
-            credentialsId: env.GIT_CREDS_ID
-          ]]
-        ])
+        script {
+          def remoteCfg = [url: env.GIT_URL]
+          if (env.GIT_CREDS_ID?.trim()) {
+            remoteCfg.credentialsId = env.GIT_CREDS_ID
+          }
+
+          checkout([$class: 'GitSCM',
+            branches: [[name: "*/${env.GIT_BRANCH}"]],
+            userRemoteConfigs: [remoteCfg]
+          ])
+        }
       }
     }
 
