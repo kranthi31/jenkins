@@ -74,6 +74,11 @@ pipeline {
         }
       }
     }
+        stage('Deploy2') { 
+            steps {
+                sh 'echo ${envVar3}'
+                echo "${env.REPO_NAME}"
+            }
 
     stage('Tag & Push') {
       steps {
