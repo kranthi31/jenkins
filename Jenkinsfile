@@ -8,7 +8,7 @@ pipeline {
     GIT_CREDS_ID = ""   // set Jenkins credentialsId if private repo, else keep ""
 
     // --- AWS/ECR ---
-    AWS_REGION   = "us-west-2"
+    AWS_REGION   = "us-east"
     AWS_ACCOUNT  = "548889528327"
     ECR_REPO     = "rails-app"
     ECR_REGISTRY = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com"
